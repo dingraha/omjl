@@ -4,7 +4,7 @@ import openmdao.api as om
 
 
 def _initialize_common(self):
-    self.options.declare('jlcomp', types=int)
+    self.options.declare('jlcomp')
 
 
 def _setup_common(self):
