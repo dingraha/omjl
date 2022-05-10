@@ -2,6 +2,13 @@ from types import MethodType
 
 import openmdao.api as om
 
+# The PythonCall/JuliaCall docs say I should create a new module to avoid polluting Main, but then the seval command below doesn't work.
+# import juliacall; jl = juliacall.newmodule("OMJL")
+import juliacall; jl = juliacall.Main
+
+# This imports the Julia package OpenMDAOCore:
+jl.seval("using OpenMDAOCore: OpenMDAOCore")
+
 
 def _initialize_common(self):
     self.options.declare('jlcomp')
@@ -9,21 +16,20 @@ def _initialize_common(self):
 
 def _setup_common(self):
     self._jlcomp = self.options['jlcomp']
-    # self._julia_setup = get_py2jl_setup(self._jlcomp)
-    # input_data, output_data, partials_data = self._julia_setup(self._jlcomp)
+    input_data, output_data, partials_data = jl.OpenMDAOCore.setup(self._jlcomp)
 
-    # for var in input_data:
-    #     self.add_input(var.name, shape=var.shape, val=var.val,
-    #                    units=var.units)
+    for var in input_data:
+        self.add_input(var.name, shape=var.shape, val=var.val,
+                       units=var.units)
 
-    # for var in output_data:
-    #     self.add_output(var.name, shape=var.shape, val=var.val,
-    #                     units=var.units)
+    for var in output_data:
+        self.add_output(var.name, shape=var.shape, val=var.val,
+                        units=var.units)
 
-    # for data in partials_data:
-    #     self.declare_partials(data.of, data.wrt,
-    #                           rows=data.rows, cols=data.cols,
-    #                           val=data.val)
+    for data in partials_data:
+        self.declare_partials(data.of, data.wrt,
+                              rows=data.rows, cols=data.cols,
+                              val=data.val)
 
 
 class JuliaExplicitComp(om.ExplicitComponent):
@@ -33,27 +39,22 @@ class JuliaExplicitComp(om.ExplicitComponent):
 
     def setup(self):
         _setup_common(self)
-        # self._julia_compute = get_py2jl_compute(self._jlcomp)
-        # self._julia_compute_partials = get_py2jl_compute_partials(self._jlcomp)
 
     def compute(self, inputs, outputs):
-        pass
-        # inputs_dict = dict(inputs)
-        # outputs_dict = dict(outputs)
+        inputs_dict = juliacall.convert(jl.Dict, dict(inputs))
+        outputs_dict = juliacall.convert(jl.Dict, dict(outputs))
 
-        # self._julia_compute(self._jlcomp, inputs_dict, outputs_dict)
+        jl.OpenMDAOCore.compute_b(self._jlcomp, inputs_dict, outputs_dict)
 
     def compute_partials(self, inputs, partials):
-        pass
-        # if self._julia_compute_partials:
-        #     inputs_dict = dict(inputs)
+        inputs_dict = juliacall.convert(jl.Dict, dict(inputs))
 
-        #     partials_dict = {}
-        #     for of_wrt in self._declared_partials:
-        #         partials_dict[of_wrt] = partials[of_wrt]
+        partials_dict = {}
+        for of_wrt in self._declared_partials:
+            partials_dict[of_wrt] = partials[of_wrt]
+        partials_dict = juliacall.convert(jl.Dict, partials_dict)
 
-        #     self._julia_compute_partials(self._jlcomp, inputs_dict, partials_dict)
-
+        jl.OpenMDAOCore.compute_partials_b(self._jlcomp, inputs_dict, partials_dict)
 
 
 class JuliaImplicitComp(om.ImplicitComponent):
@@ -89,27 +90,22 @@ class JuliaImplicitComp(om.ImplicitComponent):
         #    self.apply_linear = MethodType(apply_linear, self)
 
     def apply_nonlinear(self, inputs, outputs, residuals):
-        pass
-        # if self._julia_apply_nonlinear:
-        #     inputs_dict = dict(inputs)
-        #     outputs_dict = dict(outputs)
-        #     residuals_dict = dict(residuals)
+        inputs_dict = juliacall.convert(jl.Dict, dict(inputs))
+        outputs_dict = juliacall.convert(jl.Dict, dict(outputs))
+        residuals_dict = juliacall.convert(jl.Dict, dict(residuals))
 
-        #     self._julia_apply_nonlinear(self._jlcomp, inputs_dict, outputs_dict,
-        #                                 residuals_dict)
+        jl.OpenMDAOCore.apply_nonlinear_b(self._jlcomp, inputs_dict, outputs_dict, residuals_dict)
 
     def linearize(self, inputs, outputs, partials):
-        pass
-        # if self._julia_linearize:
-        #     inputs_dict = dict(inputs)
-        #     outputs_dict = dict(outputs)
+        inputs_dict = juliacall.convert(jl.Dict, dict(inputs))
+        outputs_dict = juliacall.convert(jl.Dict, dict(outputs))
 
-        #     partials_dict = {}
-        #     for of_wrt in self._declared_partials:
-        #         partials_dict[of_wrt] = partials[of_wrt]
+        partials_dict = {}
+        for of_wrt in self._declared_partials:
+            partials_dict[of_wrt] = partials[of_wrt]
+        partials_dict = juliacall.convert(jl.Dict, partials_dict)
 
-        #     self._julia_linearize(self._jlcomp, inputs_dict, outputs_dict,
-        #                           partials_dict)
+        jl.OpenMDAOCore.linearize_b(self._jlcomp, inputs_dict, outputs_dict, partials_dict)
 
     def guess_nonlinear(self, inputs, outputs, residuals):
         pass
